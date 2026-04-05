@@ -38,3 +38,9 @@ class MFADisableRequest(BaseModel):
 
 class MFAVerifyRequest(BaseModel):
     code: str
+
+
+class PermissionRead(BaseModel):
+    id: int
+    code: str
+    description: str | None = None
