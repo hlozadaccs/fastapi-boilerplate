@@ -43,11 +43,22 @@ class AuthService:
             logger.warning("inactive_account_attempt", email=email, user_id=user.id)
             raise AuthenticationError("Account is disabled. Contact support.")
 
+        # Check if account is temporarily locked (password)
+        login_key = f"failed_login:{email}"
+        login_attempts = int(await redis.get(login_key) or 0)
+        if login_attempts >= MAX_FAILED_ATTEMPTS:
+            logger.warning(
+                "account_temporarily_locked",
+                email=email,
+                user_id=user.id,
+                attempts=login_attempts,
+            )
+            raise AuthenticationError("Account temporarily locked due to multiple failed attempts. Try again later.")
+
         if not verify_password(password, user.password):
             # Increment failed attempts in Redis (with TTL window)
-            key = f"failed_login:{email}"
-            attempts = await redis.incr(key)
-            await redis.expire(key, ATTEMPTS_WINDOW_SECONDS)
+            attempts = await redis.incr(login_key)
+            await redis.expire(login_key, ATTEMPTS_WINDOW_SECONDS)
 
             if attempts >= MAX_FAILED_ATTEMPTS:
                 logger.warning(
@@ -68,27 +79,35 @@ class AuthService:
 
         # Check MFA if enabled
         if user.mfa_enabled:
+            mfa_key = f"failed_mfa:{user.id}"
+            mfa_attempts = int(await redis.get(mfa_key) or 0)
+            
+            if mfa_attempts >= MAX_FAILED_ATTEMPTS:
+                logger.warning(
+                    "account_locked_mfa_failures",
+                    user_id=user.id,
+                    attempts=mfa_attempts,
+                )
+                raise AuthenticationError("Account temporarily locked due to multiple failed MFA attempts. Try again later.")
+
             if not mfa_code:
                 logger.info("mfa_required", user_id=user.id)
                 raise AuthenticationError("MFA code required", mfa_required=True)
             
             if not MFAService.verify_code(user.mfa_secret, mfa_code):
                 # Track MFA failed attempts
-                mfa_key = f"failed_mfa:{user.id}"
-                mfa_attempts = await redis.incr(mfa_key)
+                attempts = await redis.incr(mfa_key)
                 await redis.expire(mfa_key, ATTEMPTS_WINDOW_SECONDS)
                 
-                if mfa_attempts >= MAX_FAILED_ATTEMPTS:
-                    user.is_active = False
-                    await db.flush()
+                if attempts >= MAX_FAILED_ATTEMPTS:
                     logger.warning(
                         "account_locked_mfa_failures",
                         user_id=user.id,
-                        attempts=mfa_attempts,
+                        attempts=attempts,
                     )
-                    raise AuthenticationError("Account locked due to multiple failed MFA attempts. Contact support.")
+                    raise AuthenticationError("Account temporarily locked due to multiple failed MFA attempts. Try again later.")
                 
-                logger.warning("mfa_verification_failed", user_id=user.id, attempts=mfa_attempts)
+                logger.warning("mfa_verification_failed", user_id=user.id, attempts=attempts)
                 raise AuthenticationError("Invalid MFA code")
             
             # Clear MFA attempts on success

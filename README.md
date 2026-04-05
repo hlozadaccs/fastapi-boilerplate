@@ -10,7 +10,7 @@ FastAPI boilerplate for building production-ready microservices with clean archi
 - SQLAlchemy 2.x Async - Modern async ORM with full typing
 - BaseRepository Pattern - Generic CRUD operations to reduce boilerplate
 - Alembic Migrations - Database version control
-- Argon2 Hashing - Secure password and token hashing
+- Advanced Cryptography - Secure password hashing (Argon2) and fast token lookups (SHA-256)
 - Structured Logging - Structlog with JSON output for production
 - Pre-commit Hooks - Ruff, mypy, and code quality checks
 - Docker Ready - Docker Compose for local development
@@ -49,8 +49,8 @@ app/
 │       ├── dependencies.py  # get_db dependency
 │       └── repository.py    # BaseRepository[T]
 ├── scripts/            # Utility scripts
-│   ├── seed_permissions.py
-│   └── create_admin.py
+│   ├── seed_roles.py
+│   └── create_user.py
 └── main.py            # FastAPI app initialization
 ```
 
@@ -77,12 +77,14 @@ poetry run alembic upgrade head
 
 ### 4. Seed initial data
 
+Permissions are auto-generated on startup, but you must seed base roles and users:
+
 ```bash
-# Create roles and permissions
-poetry run python -m app.scripts.seed_permissions
+# Create roles (admin, user)
+poetry run python -m app.scripts.seed_roles
 
 # Create admin user
-poetry run python -m app.scripts.create_admin
+poetry run python -m app.scripts.create_user --email admin@example.com --password admin --first-name Admin --last-name User --admin
 ```
 
 ### 5. Run the application
@@ -117,7 +119,7 @@ Content-Type: application/json
 
 - Access token expires in 15 minutes
 - Refresh token expires in 7 days
-- Refresh token is hashed with Argon2 before storage
+- Refresh token is hashed with SHA-256 before storage (Fast O(1) lookups)
 
 ### 2. Refresh Token
 ```http
@@ -205,7 +207,7 @@ Good approach: Query permissions on each request
 
 ### Default Roles
 
-After running `seed_permissions`:
+Permissions are discovered instantly when the code runs (Lifespan Hook). Roles can be seeded via explicitly running `seed_roles`:
 
 - **admin**: All permissions
 - **user**: Only `user:read`
@@ -350,8 +352,8 @@ docker compose up -d
 docker compose exec api poetry run alembic upgrade head
 
 # Seed data
-docker compose exec api poetry run python -m app.scripts.seed_permissions
-docker compose exec api poetry run python -m app.scripts.create_admin
+docker compose exec api poetry run python -m app.scripts.seed_roles
+docker compose exec api poetry run python -m app.scripts.create_user --email admin@example.com --password admin --first-name Admin --last-name User --admin
 
 # View logs
 docker compose logs -f api
@@ -546,8 +548,8 @@ path:"/api/v1/users" AND status_code:500
 
 ## Security Best Practices
 
-- Passwords hashed with Argon2
-- Refresh tokens hashed before storage
+- Passwords hashed with Argon2 (slow, computationally intensive)
+- Refresh tokens hashed with SHA-256 before storage (fast, deterministic)
 - Token rotation on refresh
 - JWT only contains minimal data (user_id)
 - Permissions checked on every request

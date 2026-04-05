@@ -61,4 +61,6 @@ def require_permission(permission_code: str):
             )
         return user_id
 
+    # Label the closure so it can be introspected by the app on startup
+    permission_checker.permission_code = permission_code
     return permission_checker

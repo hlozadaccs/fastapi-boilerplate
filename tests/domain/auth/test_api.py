@@ -159,6 +159,7 @@ class TestMFA:
         response = await client.post(
             "/api/v1/auth/mfa/setup",
             headers={"Authorization": f"Bearer {access_token}"},
+            json={"password": "password123"},
         )
         assert response.status_code == 200
         data = response.json()
@@ -177,6 +178,7 @@ class TestMFA:
         await client.post(
             "/api/v1/auth/mfa/setup",
             headers={"Authorization": f"Bearer {access_token}"},
+            json={"password": "password123"},
         )
 
         # Mock valid TOTP code
@@ -267,9 +269,9 @@ class TestMFA:
             assert response.status_code == 401
             assert "locked" in response.json()["detail"].lower()
             
-            # Verify account is locked in DB
+            # Verify account is NOT deactivated in DB, just rate-limited
             await db_session.refresh(test_user_with_mfa)
-            assert test_user_with_mfa.is_active is False
+            assert test_user_with_mfa.is_active is True
 
     async def test_mfa_disable(self, client: AsyncClient, test_user_with_mfa: User):
         with patch("app.domain.auth.service.MFAService.verify_code", return_value=True):
@@ -286,6 +288,6 @@ class TestMFA:
             response = await client.post(
                 "/api/v1/auth/mfa/disable",
                 headers={"Authorization": f"Bearer {access_token}"},
-                json={"code": "123456"},
+                json={"code": "123456", "password": "password123"},
             )
             assert response.status_code == 204

@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.openapi.utils import get_openapi
@@ -18,14 +20,26 @@ from app.domain.auth.router import router as auth_router
 from app.domain.health.router import router as health_router
 from app.domain.role.router import router as role_router
 from app.domain.user.router import router as user_router
+from app.infrastructure.db.session import AsyncSessionLocal
+from app.core.permissions import auto_sync_permissions
 
 # Configure logging on startup
 configure_logging()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Sync permissions dynamically based on SQLAlchemy mappers and endpoints
+    async with AsyncSessionLocal() as db:
+        await auto_sync_permissions(db, app=app)
+    yield
+
 
 app = FastAPI(
     title=settings.app_name,
     debug=settings.debug,
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # Add exception handlers
