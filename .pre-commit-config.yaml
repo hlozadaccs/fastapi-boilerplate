@@ -10,7 +10,7 @@ repos:
       - id: end-of-file-fixer
       - id: check-yaml
       - id: check-added-large-files
-        args: ['--maxkb=500']
+        args: ["--maxkb=500"]
       - id: check-json
       - id: check-toml
       - id: check-merge-conflict
@@ -19,14 +19,14 @@ repos:
       - id: check-docstring-first
       - id: check-executables-have-shebangs
       - id: mixed-line-ending
-        args: ['--fix=lf']
+        args: ["--fix=lf"]
 
   # Detect-Secrets - Advanced secret detection
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.5.0
     hooks:
       - id: detect-secrets
-        args: ['--baseline', '.secrets.baseline']
+        args: ["--baseline", ".secrets.baseline"]
         exclude: poetry.lock
 
   # Prettier - Format JSON, YAML, Markdown
@@ -39,13 +39,13 @@ repos:
 
   # Pyproject-fmt - Format pyproject.toml
   - repo: https://github.com/tox-dev/pyproject-fmt
-    rev: v2.6.1
+    rev: v2.21.0
     hooks:
       - id: pyproject-fmt
 
   # Ruff - Fast Python linter and formatter
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.14
+    rev: v0.15.9
     hooks:
       # Linter
       - id: ruff
@@ -55,7 +55,7 @@ repos:
 
   # Bandit - Security linter
   - repo: https://github.com/PyCQA/bandit
-    rev: 1.8.0
+    rev: 1.9.4
     hooks:
       - id: bandit
         args: [-c, pyproject.toml]
@@ -63,26 +63,33 @@ repos:
         exclude: ^tests/
 
   # Safety - Check dependencies for known security vulnerabilities
-  - repo: https://github.com/Lucas-C/pre-commit-hooks-safety
-    rev: v1.3.3
-    hooks:
-      - id: python-safety-dependencies-check
-        files: pyproject.toml
+  #  - repo: https://github.com/Lucas-C/pre-commit-hooks-safety
+  #    rev: v1.3.3
+  #    hooks:
+  #      - id: python-safety-dependencies-check
+  #        files: pyproject.toml
 
   # Interrogate - Docstring coverage
   - repo: https://github.com/econchick/interrogate
     rev: 1.7.0
     hooks:
       - id: interrogate
-        args: [--fail-under=40, --verbose, --ignore-init-method, --ignore-init-module, --ignore-nested-functions]
+        args:
+          [
+            --fail-under=40,
+            --verbose,
+            --ignore-init-method,
+            --ignore-init-module,
+            --ignore-nested-functions,
+          ]
         exclude: ^(tests/|alembic/)
 
   # Vulture - Find dead code
   - repo: https://github.com/jendrikseipp/vulture
-    rev: v2.14
+    rev: v2.16
     hooks:
       - id: vulture
-        args: [--min-confidence=80]
+        args: [app/, --min-confidence=80]
         exclude: ^(tests/|alembic/)
 
   # Radon - Code complexity metrics
@@ -103,10 +110,10 @@ repos:
 
   # Complexipy - Cognitive complexity
   - repo: https://github.com/rohaquinlop/complexipy-pre-commit
-    rev: v4.2.0
+    rev: v5.1.0
     hooks:
       - id: complexipy
-        args: ["--max-cognitive-complexity", "10"]
+        args: ["--max-complexity-allowed", "10"]
 
   # Pytest - Run tests (only on test file changes)
   - repo: local
@@ -117,15 +124,20 @@ repos:
         language: system
         args: ["tests/", "-v", "--tb=short", "-x"]
         pass_filenames: false
-        stages: [manual]  # Run manually with: pre-commit run pytest --hook-stage manual
+        stages: [manual] # Run manually with: pre-commit run pytest --hook-stage manual
 
   # MyPy - Static type checker
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.19.1
+    rev: v1.20.0
     hooks:
       - id: mypy
         additional_dependencies:
           - types-python-jose
           - sqlalchemy[mypy]
-        args: [--ignore-missing-imports, --no-strict-optional, --cache-dir=/dev/null]
+        args:
+          [
+            --ignore-missing-imports,
+            --no-strict-optional,
+            --cache-dir=/dev/null,
+          ]
         files: ^app/

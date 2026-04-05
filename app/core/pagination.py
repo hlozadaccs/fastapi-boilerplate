@@ -1,15 +1,16 @@
 from math import ceil
-from typing import Generic, TypeVar
+from typing import TypeVar
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.selectable import Select
 
 from app.core.responses import PaginatedData, PaginationMeta
 
 T = TypeVar("T")
 
 
-class Paginator(Generic[T]):
+class Paginator[T]:
     """Reusable paginator for SQLAlchemy queries."""
 
     def __init__(self, page: int = 1, page_size: int = 20):
@@ -24,7 +25,7 @@ class Paginator(Generic[T]):
     async def paginate(
         self,
         db: AsyncSession,
-        query: select,
+        query: Select,
     ) -> PaginatedData[T]:
         """Execute paginated query and return structured data."""
         # Get total count

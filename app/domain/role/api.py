@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, Path, status
+from typing import Annotated
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -45,7 +47,7 @@ async def get_role(
     role = await role_service.get_role_with_permissions(db, role_id)
     if not role:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role not found")
-    
+
     return RoleRead(
         id=role.id,
         name=role.name,
@@ -62,10 +64,10 @@ async def list_roles(
     db: AsyncSession = Depends(get_db),
     _: int = Depends(require_permission("role:read")),
 ):
-    paginator = Paginator(page=pagination.page, page_size=pagination.page_size)
+    paginator: Paginator[Role] = Paginator(page=pagination.page, page_size=pagination.page_size)
     query = select(Role)
     result = await paginator.paginate(db, query)
-    
+
     # Transform to include permissions
     items_with_perms = [
         RoleRead(
@@ -78,7 +80,7 @@ async def list_roles(
         )
         for role in result.items
     ]
-    
+
     return PaginatedData(
         items=items_with_perms,
         pagination=result.pagination,
@@ -87,8 +89,8 @@ async def list_roles(
 
 @router.put("/{role_id}", response_model=RoleRead)
 async def update_role(
+    payload: Annotated[RoleUpdate, Body()],
     role_id: int = Path(..., gt=0),
-    payload: RoleUpdate = ...,
     db: AsyncSession = Depends(get_db),
     _: int = Depends(require_permission("role:update")),
 ):
@@ -96,7 +98,7 @@ async def update_role(
         role = await role_service.update_role(db, role_id, payload)
         if not role:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role not found")
-        
+
         await db.commit()
         return RoleRead(
             id=role.id,
@@ -112,8 +114,8 @@ async def update_role(
 
 @router.patch("/{role_id}", response_model=RoleRead)
 async def partial_update_role(
+    payload: Annotated[RoleUpdate, Body()],
     role_id: int = Path(..., gt=0),
-    payload: RoleUpdate = ...,
     db: AsyncSession = Depends(get_db),
     _: int = Depends(require_permission("role:update")),
 ):
@@ -121,7 +123,7 @@ async def partial_update_role(
         role = await role_service.update_role(db, role_id, payload)
         if not role:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role not found")
-        
+
         await db.commit()
         return RoleRead(
             id=role.id,

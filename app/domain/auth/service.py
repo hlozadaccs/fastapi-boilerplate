@@ -1,4 +1,4 @@
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 import structlog
 from redis.asyncio import Redis
@@ -11,7 +11,7 @@ from app.core.jwt import (
     get_refresh_token_expiry,
 )
 from app.core.mfa import MFAService
-from app.core.security import hash_token, verify_password, verify_token
+from app.core.security import hash_token, verify_password
 from app.domain.auth.exceptions import AuthenticationError
 from app.domain.auth.model import RefreshToken, User
 
@@ -31,6 +31,24 @@ class AuthService:
         mfa_code: str | None = None,
     ) -> dict:
         """Authenticate user and issue tokens."""
+        user = await AuthService._get_active_user(db, email)
+        await AuthService._check_lockout_status(redis, user)
+
+        if not verify_password(password, user.password):
+            await AuthService._handle_failed_password(redis, user)
+
+        if user.mfa_enabled:
+            await AuthService._verify_mfa(redis, user, mfa_code)
+
+        # Success: clear failed attempts and issue tokens
+        await redis.delete(f"failed_login:{user.email}")
+        logger.info("user_authenticated", user_id=user.id, email=email)
+
+        return await AuthService._issue_tokens(db, user)
+
+    @staticmethod
+    async def _get_active_user(db: AsyncSession, email: str) -> User:
+        """Fetch and validate active user."""
         result = await db.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
 
@@ -38,91 +56,69 @@ class AuthService:
             logger.warning("authentication_failed", email=email, reason="user_not_found")
             raise AuthenticationError("Invalid credentials")
 
-        # Check if account is permanently disabled
         if not user.is_active:
             logger.warning("inactive_account_attempt", email=email, user_id=user.id)
             raise AuthenticationError("Account is disabled. Contact support.")
 
-        # Check if account is temporarily locked (password)
-        login_key = f"failed_login:{email}"
-        login_attempts = int(await redis.get(login_key) or 0)
-        if login_attempts >= MAX_FAILED_ATTEMPTS:
-            logger.warning(
-                "account_temporarily_locked",
-                email=email,
-                user_id=user.id,
-                attempts=login_attempts,
-            )
-            raise AuthenticationError("Account temporarily locked due to multiple failed attempts. Try again later.")
+        return user
 
-        if not verify_password(password, user.password):
-            # Increment failed attempts in Redis (with TTL window)
-            attempts = await redis.incr(login_key)
-            await redis.expire(login_key, ATTEMPTS_WINDOW_SECONDS)
+    @staticmethod
+    async def _check_lockout_status(redis: Redis, user: User) -> None:
+        """Check if account is temporarily locked."""
+        for key in [f"failed_login:{user.email}", f"failed_mfa:{user.id}"]:
+            attempts = int(await redis.get(key) or 0)
+            if attempts >= MAX_FAILED_ATTEMPTS:
+                logger.warning("account_temporarily_locked", user_id=user.id, attempts=attempts)
+                raise AuthenticationError(
+                    "Account temporarily locked due to multiple failed attempts. Try again later."
+                )
+
+    @staticmethod
+    async def _handle_failed_password(redis: Redis, user: User) -> None:
+        """Track and handle password failures."""
+        login_key = f"failed_login:{user.email}"
+        attempts = await redis.incr(login_key)
+        await redis.expire(login_key, ATTEMPTS_WINDOW_SECONDS)
+
+        if attempts >= MAX_FAILED_ATTEMPTS:
+            logger.warning("account_temporarily_locked", user_id=user.id, attempts=attempts)
+            raise AuthenticationError(
+                "Account temporarily locked due to multiple failed attempts. Try again later."
+            )
+
+        logger.warning("authentication_failed", user_id=user.id, reason="invalid_password")
+        raise AuthenticationError("Invalid credentials")
+
+    @staticmethod
+    async def _verify_mfa(redis: Redis, user: User, mfa_code: str | None) -> None:
+        """Verify MFA code and handle failures."""
+        if not mfa_code:
+            logger.info("mfa_required", user_id=user.id)
+            raise AuthenticationError("MFA code required", mfa_required=True)
+
+        if not MFAService.verify_code(user.mfa_secret, mfa_code):
+            mfa_key = f"failed_mfa:{user.id}"
+            attempts = await redis.incr(mfa_key)
+            await redis.expire(mfa_key, ATTEMPTS_WINDOW_SECONDS)
 
             if attempts >= MAX_FAILED_ATTEMPTS:
-                logger.warning(
-                    "account_temporarily_locked",
-                    email=email,
-                    user_id=user.id,
-                    attempts=attempts,
+                logger.warning("account_locked_mfa_failures", user_id=user.id, attempts=attempts)
+                raise AuthenticationError(
+                    "Account temporarily locked due to multiple failed MFA attempts. Try again later."
                 )
-                raise AuthenticationError("Account temporarily locked due to multiple failed attempts. Try again later.")
 
-            logger.warning(
-                "authentication_failed",
-                email=email,
-                reason="invalid_password",
-                attempts=attempts,
-            )
-            raise AuthenticationError("Invalid credentials")
+            logger.warning("mfa_verification_failed", user_id=user.id, attempts=attempts)
+            raise AuthenticationError("Invalid MFA code")
 
-        # Check MFA if enabled
-        if user.mfa_enabled:
-            mfa_key = f"failed_mfa:{user.id}"
-            mfa_attempts = int(await redis.get(mfa_key) or 0)
-            
-            if mfa_attempts >= MAX_FAILED_ATTEMPTS:
-                logger.warning(
-                    "account_locked_mfa_failures",
-                    user_id=user.id,
-                    attempts=mfa_attempts,
-                )
-                raise AuthenticationError("Account temporarily locked due to multiple failed MFA attempts. Try again later.")
+        await redis.delete(f"failed_mfa:{user.id}")
+        logger.info("mfa_verified", user_id=user.id)
 
-            if not mfa_code:
-                logger.info("mfa_required", user_id=user.id)
-                raise AuthenticationError("MFA code required", mfa_required=True)
-            
-            if not MFAService.verify_code(user.mfa_secret, mfa_code):
-                # Track MFA failed attempts
-                attempts = await redis.incr(mfa_key)
-                await redis.expire(mfa_key, ATTEMPTS_WINDOW_SECONDS)
-                
-                if attempts >= MAX_FAILED_ATTEMPTS:
-                    logger.warning(
-                        "account_locked_mfa_failures",
-                        user_id=user.id,
-                        attempts=attempts,
-                    )
-                    raise AuthenticationError("Account temporarily locked due to multiple failed MFA attempts. Try again later.")
-                
-                logger.warning("mfa_verification_failed", user_id=user.id, attempts=attempts)
-                raise AuthenticationError("Invalid MFA code")
-            
-            # Clear MFA attempts on success
-            await redis.delete(f"failed_mfa:{user.id}")
-            logger.info("mfa_verified", user_id=user.id)
-
-        # Success: clear failed attempts
-        await redis.delete(f"failed_login:{email}")
-        logger.info("user_authenticated", user_id=user.id, email=email)
-
-        # Generate tokens
+    @staticmethod
+    async def _issue_tokens(db: AsyncSession, user: User) -> dict:
+        """Generate and store new tokens."""
         access_token = create_access_token(user.id)
         refresh_token_value = create_refresh_token_value()
 
-        # Store hashed refresh token in database
         refresh_token = RefreshToken(
             user_id=user.id,
             token_hash=hash_token(refresh_token_value),
@@ -135,7 +131,7 @@ class AuthService:
         return {
             "access_token": access_token,
             "refresh_token": refresh_token_value,
-            "token_type": "bearer",
+            "token_type": "bearer",  # nosec B105
         }
 
     @staticmethod
@@ -182,7 +178,7 @@ class AuthService:
         return {
             "access_token": access_token,
             "refresh_token": new_refresh_token_value,
-            "token_type": "bearer",
+            "token_type": "bearer",  # nosec B105
         }
 
     @staticmethod

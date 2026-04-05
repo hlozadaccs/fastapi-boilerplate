@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, Path, status
+from typing import Annotated
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -52,15 +54,15 @@ async def list_users(
     db: AsyncSession = Depends(get_db),
     _: int = Depends(require_permission("user:read")),
 ):
-    paginator = Paginator(page=pagination.page, page_size=pagination.page_size)
+    paginator: Paginator[User] = Paginator(page=pagination.page, page_size=pagination.page_size)
     query = select(User)
     return await paginator.paginate(db, query)
 
 
 @router.put("/{user_id}", response_model=UserRead)
 async def update_user(
+    payload: Annotated[UserUpdate, Body()],
     user_id: int = Path(..., gt=0),
-    payload: UserUpdate = ...,
     db: AsyncSession = Depends(get_db),
     _: int = Depends(require_permission("user:update")),
 ):
@@ -75,8 +77,8 @@ async def update_user(
 
 @router.patch("/{user_id}", response_model=UserRead)
 async def partial_update_user(
+    payload: Annotated[UserUpdate, Body()],
     user_id: int = Path(..., gt=0),
-    payload: UserUpdate = ...,
     db: AsyncSession = Depends(get_db),
     _: int = Depends(require_permission("user:update")),
 ):
@@ -99,12 +101,15 @@ async def delete_user(
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
+
 @router.patch("/{user_id}/admin-status", response_model=UserRead)
 async def update_admin_status(
     payload: AdminStatusUpdate,
     user_id: int = Path(..., gt=0),
     db: AsyncSession = Depends(get_db),
-    _: int = Depends(require_permission("user:update")),  # In a real app, use something like "user:manage_admins"
+    _: int = Depends(
+        require_permission("user:update")
+    ),  # In a real app, use something like "user:manage_admins"
 ):
     user = await user_service.update_admin_status(db, user_id, payload.is_admin)
     if not user:

@@ -1,15 +1,12 @@
 from logging.config import fileConfig
 
 from sqlalchemy import pool
-from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
-
 from app.core.config import settings
+from app.domain.auth.model import Permission, RefreshToken, Role, User  # noqa: F401
 from app.infrastructure.db.base import Base
-from app.domain.auth.model import User, Role, Permission, RefreshToken  # noqa: F401
-
 
 # Alembic Config object
 config = context.config
@@ -58,11 +55,10 @@ def run_migrations_online() -> None:
                 )
             )
 
-            await connection.run_sync(
-                lambda _: context.run_migrations()
-            )
+            await connection.run_sync(lambda _: context.run_migrations())
 
     import asyncio
+
     asyncio.run(do_run_migrations())
 
 

@@ -98,6 +98,7 @@ Visit http://localhost:8000/docs for Swagger UI.
 ## Authentication Flow
 
 ### 1. Login
+
 ```http
 POST /api/v1/auth/login
 Content-Type: application/json
@@ -109,6 +110,7 @@ Content-Type: application/json
 ```
 
 **Response:**
+
 ```json
 {
   "access_token": "eyJ...",
@@ -122,6 +124,7 @@ Content-Type: application/json
 - Refresh token is hashed with SHA-256 before storage (Fast O(1) lookups)
 
 ### 2. Refresh Token
+
 ```http
 POST /api/v1/auth/refresh
 Content-Type: application/json
@@ -132,6 +135,7 @@ Content-Type: application/json
 ```
 
 **Response:**
+
 ```json
 {
   "access_token": "eyJ...",
@@ -145,6 +149,7 @@ Content-Type: application/json
 - Prevents token reuse attacks
 
 ### 3. Logout
+
 ```http
 POST /api/v1/auth/logout
 Authorization: Bearer eyJ...
@@ -160,6 +165,7 @@ Authorization: Bearer eyJ...
 Permissions follow the pattern: `resource:action`
 
 Examples:
+
 - `user:create` - Create users
 - `user:read` - Read user information
 - `user:update` - Update users
@@ -195,11 +201,13 @@ async def create_user(
 ### Why Permissions Are NOT in JWT
 
 Bad approach: Store permissions in JWT claims
+
 - Requires token reissue when permissions change
 - Tokens become large with many permissions
 - Security risk if tokens are long-lived
 
 Good approach: Query permissions on each request
+
 - Permissions can be changed instantly
 - JWT only contains `user_id`
 - Minimal token size
@@ -272,6 +280,7 @@ from app.domain.user.model import User
 ```
 
 **Why?**
+
 - `User` model lives in `auth` domain (identity, authentication, authorization)
 - `user` domain only handles CRUD operations on the User resource
 - This separation keeps authentication/authorization logic centralized
@@ -279,6 +288,7 @@ from app.domain.user.model import User
 ### When to Use Each Domain
 
 **`app.domain.auth/`** - Use for:
+
 - User model definition
 - Authentication (login, logout, refresh)
 - Authorization (roles, permissions)
@@ -286,6 +296,7 @@ from app.domain.user.model import User
 - Security-related operations
 
 **`app.domain.user/`** - Use for:
+
 - User CRUD endpoints (`GET /users`, `POST /users`, etc.)
 - User management operations
 - User-specific business logic (not auth-related)
@@ -305,6 +316,7 @@ poetry run pre-commit run --all-files
 ```
 
 Includes:
+
 - **Ruff** - Fast Python linter and formatter
 - **MyPy** - Static type checking
 - **General hooks** - Trailing whitespace, EOF, YAML/JSON validation, secret detection
@@ -416,6 +428,7 @@ Follow the same pattern as `user` or `auth` modules.
 The application uses **structlog** for structured, production-ready logging.
 
 **Features:**
+
 - JSON output in production for log aggregation (ELK, Datadog, CloudWatch)
 - Human-readable console output in development
 - Automatic request logging with unique `request_id`
@@ -432,12 +445,14 @@ configure_logging()  # Called in main.py
 ```
 
 **Environment-based behavior:**
+
 - `debug=True` (development): Console renderer with colors
 - `debug=False` (production): JSON renderer for log aggregation
 
 ### Request Logging Middleware
 
 All HTTP requests are automatically logged with:
+
 - `request_id` - Unique identifier for request tracing
 - `method` - HTTP method (GET, POST, etc.)
 - `path` - Request path
@@ -470,6 +485,7 @@ except Exception as exc:
 ### Log Output Examples
 
 **Development (console):**
+
 ```
 2024-02-01 10:30:45 [info     ] request_started method=POST path=/api/v1/users request_id=abc-123
 2024-02-01 10:30:45 [info     ] user_created user_id=42 email=user@example.com
@@ -477,6 +493,7 @@ except Exception as exc:
 ```
 
 **Production (JSON):**
+
 ```json
 {
   "event": "request_started",
@@ -509,6 +526,7 @@ logger.info("action_performed")  # Includes user_id and organization_id
 ### Best Practices
 
 1. **Use structured fields** instead of string formatting:
+
    ```python
    # Good
    logger.info("user_login", user_id=123, email="user@example.com")
@@ -533,6 +551,7 @@ logger.info("action_performed")  # Includes user_id and organization_id
 ### Integration with Monitoring
 
 JSON logs can be easily integrated with:
+
 - **ELK Stack** (Elasticsearch, Logstash, Kibana)
 - **Datadog**
 - **AWS CloudWatch**
@@ -540,6 +559,7 @@ JSON logs can be easily integrated with:
 - **Grafana Loki**
 
 Filter and search by any field:
+
 ```
 request_id:"abc-123"
 user_id:42 AND level:"error"

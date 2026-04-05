@@ -20,6 +20,7 @@ class UserUpdate(BaseModel):
     email: EmailStr | None = None
     password: str | None = None
 
+
 class AdminStatusUpdate(BaseModel):
     is_admin: bool
 

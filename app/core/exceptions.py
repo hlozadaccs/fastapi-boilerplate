@@ -5,7 +5,6 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.core.responses import ApiResponse, ErrorDetail
 from app.domain.auth.exceptions import AuthenticationError
 
 logger = structlog.get_logger(__name__)
@@ -65,7 +64,7 @@ async def authentication_error_handler(request: Request, exc: AuthenticationErro
             content={"detail": exc.message},
             headers={"X-MFA-Required": "true"},
         )
-    
+
     logger.warning("authentication_error", error=exc.message, path=request.url.path)
     return JSONResponse(
         status_code=status.HTTP_401_UNAUTHORIZED,

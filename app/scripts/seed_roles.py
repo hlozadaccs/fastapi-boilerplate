@@ -8,6 +8,7 @@ Run with: poetry run python -m app.scripts.seed_roles
 import asyncio
 
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.auth.model import Permission, Role, role_permissions
 from app.infrastructure.db.session import AsyncSessionLocal
@@ -36,42 +37,40 @@ async def seed_roles():
 
         # Fetch all auto-generated permissions
         perm_result = await db.execute(select(Permission))
-        all_permissions = perm_result.scalars().all()
-        
+        all_permissions = list(perm_result.scalars().all())
+
         if not all_permissions:
-            print("No permissions found. Ensure the app has been started at least once to auto-sync.")
+            print("No permissions found. Ensure the app has been started once to auto-sync.")
             return
 
         # Create roles and assign permissions
-        for role_name, role_config in ROLES.items():
-            role = Role(
-                name=role_name,
-                description=role_config["description"],
-            )
-            db.add(role)
-            await db.flush()
-
-            # Assign permissions
-            if role_config["permissions"] == "*":
-                # Assign all absolute permissions fetched from DB
-                perm_ids = [p.id for p in all_permissions]
-            else:
-                # Assign specific permissions
-                perm_ids = [
-                    p.id for p in all_permissions
-                    if p.code in role_config["permissions"]
-                ]
-
-            if perm_ids:
-                await db.execute(
-                    role_permissions.insert().values(
-                        [{"role_id": role.id, "permission_id": pid} for pid in perm_ids]
-                    )
-                )
+        for role_name, config in ROLES.items():
+            await _create_role_with_permissions(db, role_name, config, all_permissions)
 
         await db.commit()
-        print("Roles seeded successfully")
-        print(f"  - Created {len(ROLES)} roles")
+        print(f"✓ Roles seeded successfully ({len(ROLES)} roles)")
+
+
+async def _create_role_with_permissions(
+    db: AsyncSession, name: str, config: dict, all_perms: list[Permission]
+):
+    """Helper to create a role and assign its permissions."""
+    role = Role(name=name, description=config["description"])
+    db.add(role)
+    await db.flush()
+
+    if config["permissions"] == "*":
+        perm_ids = [p.id for p in all_perms]
+    else:
+        perm_ids = [p.id for p in all_perms if p.code in config["permissions"]]
+
+    if perm_ids:
+        await db.execute(
+            role_permissions.insert().values(
+                [{"role_id": role.id, "permission_id": pid} for pid in perm_ids]
+            )
+        )
+
 
 if __name__ == "__main__":
     asyncio.run(seed_roles())

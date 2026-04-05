@@ -20,7 +20,7 @@ async def get_current_user_id(
         token = credentials.credentials
         payload = decode_token(token)
         user_id = int(payload["sub"])
-    except (ValueError, KeyError):
+    except ValueError, KeyError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication credentials",
@@ -29,7 +29,7 @@ async def get_current_user_id(
     # Check if user exists and is active
     result = await db.execute(select(User.is_active).where(User.id == user_id))
     is_active = result.scalar_one_or_none()
-    
+
     if is_active is None or not is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -48,10 +48,10 @@ def require_permission(permission_code: str):
         # Check if user is admin
         result = await db.execute(select(User.is_admin).where(User.id == user_id))
         is_admin = result.scalar_one_or_none()
-        
+
         if is_admin:
             return user_id
-        
+
         # Check permission for non-admin users
         has_perm = await PermissionService.has_permission(db, user_id, permission_code)
         if not has_perm:
@@ -62,5 +62,5 @@ def require_permission(permission_code: str):
         return user_id
 
     # Label the closure so it can be introspected by the app on startup
-    permission_checker.permission_code = permission_code
+    permission_checker.permission_code = permission_code  # type: ignore[attr-defined]
     return permission_checker

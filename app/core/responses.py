@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Generic, TypeVar
+from typing import TypeVar
 
 from pydantic import BaseModel, Field
 
@@ -23,14 +23,14 @@ class PaginationMeta(BaseModel):
     total_pages: int = Field(..., description="Total number of pages")
 
 
-class PaginatedData(BaseModel, Generic[T]):
+class PaginatedData[T](BaseModel):
     """Paginated data wrapper."""
 
     items: list[T]
     pagination: PaginationMeta
 
 
-class ApiResponse(BaseModel, Generic[T]):
+class ApiResponse[T](BaseModel):
     """Standard API response wrapper."""
 
     success: bool

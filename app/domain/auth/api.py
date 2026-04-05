@@ -8,9 +8,9 @@ from app.domain.auth.dependencies import get_current_user_id
 from app.domain.auth.model import User
 from app.domain.auth.schema import (
     LoginRequest,
+    MFADisableRequest,
     MFAEnableRequest,
     MFASetupRequest,
-    MFADisableRequest,
     MFASetupResponse,
     RefreshTokenRequest,
     TokenResponse,
@@ -63,26 +63,27 @@ async def setup_mfa(
     """Generate MFA secret and QR code for user."""
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
-    
+
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    
+
     if user.mfa_enabled:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="MFA already enabled")
-        
+
     from app.core.security import verify_password
+
     if not verify_password(payload.password, user.password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid password")
-    
+
     # Generate new secret
     secret = MFAService.generate_secret()
     provisioning_uri = MFAService.get_provisioning_uri(secret, user.email)
     qr_code = MFAService.generate_qr_code(provisioning_uri)
-    
+
     # Store secret temporarily (not enabled yet)
     user.mfa_secret = secret
     await db.commit()
-    
+
     return MFASetupResponse(
         secret=secret,
         qr_code=qr_code,
@@ -99,17 +100,17 @@ async def enable_mfa(
     """Enable MFA after verifying code."""
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
-    
+
     if not user or not user.mfa_secret:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="MFA not set up")
-    
+
     if user.mfa_enabled:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="MFA already enabled")
-    
+
     # Verify code
     if not MFAService.verify_code(user.mfa_secret, payload.code):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid MFA code")
-    
+
     # Enable MFA
     user.mfa_enabled = True
     await db.commit()
@@ -124,18 +125,19 @@ async def disable_mfa(
     """Disable MFA after verifying code."""
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
-    
+
     if not user or not user.mfa_enabled:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="MFA not enabled")
-    
+
     from app.core.security import verify_password
+
     if not verify_password(payload.password, user.password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid password")
-        
+
     # Verify code before disabling
     if not MFAService.verify_code(user.mfa_secret, payload.code):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid MFA code")
-    
+
     # Disable MFA
     user.mfa_enabled = False
     user.mfa_secret = None

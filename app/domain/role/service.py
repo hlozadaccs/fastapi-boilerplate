@@ -11,9 +11,7 @@ class RoleService(BaseRepository[Role]):
     def __init__(self):
         super().__init__(Role)
 
-    async def create_role(
-        self, db: AsyncSession, payload: RoleCreate
-    ) -> Role:
+    async def create_role(self, db: AsyncSession, payload: RoleCreate) -> Role:
         """Create role with permissions."""
         # Check if role name already exists
         result = await db.execute(select(Role).where(Role.name == payload.name))
@@ -30,7 +28,7 @@ class RoleService(BaseRepository[Role]):
             result = await db.execute(
                 select(Permission).where(Permission.code.in_(payload.permissions))
             )
-            permissions = result.scalars().all()
+            permissions: list[Permission] = list(result.scalars().all())  # type: ignore
             found_codes = {p.code for p in permissions}
             invalid_codes = set(payload.permissions) - found_codes
             if invalid_codes:
@@ -38,16 +36,14 @@ class RoleService(BaseRepository[Role]):
             role.permissions.extend(permissions)
 
         await db.flush()
-        
+
         # Reload with permissions
         result = await db.execute(
             select(Role).where(Role.id == role.id).options(selectinload(Role.permissions))
         )
         return result.scalar_one()
 
-    async def update_role(
-        self, db: AsyncSession, role_id: int, payload: RoleUpdate
-    ) -> Role | None:
+    async def update_role(self, db: AsyncSession, role_id: int, payload: RoleUpdate) -> Role | None:
         """Update role and optionally its permissions."""
         result = await db.execute(
             select(Role).where(Role.id == role_id).options(selectinload(Role.permissions))
@@ -75,7 +71,7 @@ class RoleService(BaseRepository[Role]):
             result = await db.execute(
                 select(Permission).where(Permission.code.in_(payload.permissions))
             )
-            permissions = result.scalars().all()
+            permissions: list[Permission] = list(result.scalars().all())  # type: ignore
             found_codes = {p.code for p in permissions}
             invalid_codes = set(payload.permissions) - found_codes
             if invalid_codes:
@@ -84,16 +80,14 @@ class RoleService(BaseRepository[Role]):
             role.permissions.extend(permissions)
 
         await db.flush()
-        
+
         # Reload with permissions
         result = await db.execute(
             select(Role).where(Role.id == role.id).options(selectinload(Role.permissions))
         )
         return result.scalar_one()
 
-    async def get_role_with_permissions(
-        self, db: AsyncSession, role_id: int
-    ) -> Role | None:
+    async def get_role_with_permissions(self, db: AsyncSession, role_id: int) -> Role | None:
         """Get role with permissions loaded."""
         result = await db.execute(
             select(Role).where(Role.id == role_id).options(selectinload(Role.permissions))
