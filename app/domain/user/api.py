@@ -7,7 +7,7 @@ from app.core.responses import PaginatedData
 from app.core.schemas import PaginationParams
 from app.domain.auth.dependencies import require_permission
 from app.domain.auth.model import User
-from app.domain.user.schema import UserCreate, UserRead, UserUpdate
+from app.domain.user.schema import AdminStatusUpdate, UserCreate, UserRead, UserUpdate
 from app.domain.user.service import UserService
 from app.infrastructure.db.dependencies import get_db
 
@@ -98,3 +98,15 @@ async def delete_user(
     deleted = await user_service.delete(db, user_id)
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+@router.patch("/{user_id}/admin-status", response_model=UserRead)
+async def update_admin_status(
+    payload: AdminStatusUpdate,
+    user_id: int = Path(..., gt=0),
+    db: AsyncSession = Depends(get_db),
+    _: int = Depends(require_permission("user:update")),  # In a real app, use something like "user:manage_admins"
+):
+    user = await user_service.update_admin_status(db, user_id, payload.is_admin)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return user

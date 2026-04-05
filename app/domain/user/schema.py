@@ -19,7 +19,9 @@ class UserUpdate(BaseModel):
     last_name: str | None = None
     email: EmailStr | None = None
     password: str | None = None
-    is_admin: bool | None = None
+
+class AdminStatusUpdate(BaseModel):
+    is_admin: bool
 
 
 class UserRead(UserBase):

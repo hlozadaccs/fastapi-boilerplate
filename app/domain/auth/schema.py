@@ -23,8 +23,17 @@ class MFASetupResponse(BaseModel):
     provisioning_uri: str
 
 
+class MFASetupRequest(BaseModel):
+    password: str
+
+
 class MFAEnableRequest(BaseModel):
     code: str
+
+
+class MFADisableRequest(BaseModel):
+    code: str
+    password: str
 
 
 class MFAVerifyRequest(BaseModel):

@@ -50,16 +50,13 @@ class AuthService:
             await redis.expire(key, ATTEMPTS_WINDOW_SECONDS)
 
             if attempts >= MAX_FAILED_ATTEMPTS:
-                # Permanently disable account in database
-                user.is_active = False
-                await db.flush()
                 logger.warning(
-                    "account_permanently_locked",
+                    "account_temporarily_locked",
                     email=email,
                     user_id=user.id,
                     attempts=attempts,
                 )
-                raise AuthenticationError("Account locked due to multiple failed attempts. Contact support.")
+                raise AuthenticationError("Account temporarily locked due to multiple failed attempts. Try again later.")
 
             logger.warning(
                 "authentication_failed",
@@ -128,21 +125,16 @@ class AuthService:
         refresh_token_value: str,
     ) -> dict:
         """Rotate refresh token and issue new access token."""
-        # Find all non-revoked refresh tokens and check against hash
+        # Find matching token by its fast hash
+        target_hash = hash_token(refresh_token_value)
         result = await db.execute(
             select(RefreshToken).where(
+                RefreshToken.token_hash == target_hash,
                 RefreshToken.revoked.is_(False),
                 RefreshToken.expires_at > datetime.now(UTC),
             )
         )
-        tokens = result.scalars().all()
-
-        # Find matching token by verifying hash
-        matching_token = None
-        for token in tokens:
-            if verify_token(refresh_token_value, token.token_hash):
-                matching_token = token
-                break
+        matching_token = result.scalar_one_or_none()
 
         if not matching_token:
             logger.warning("refresh_token_invalid")

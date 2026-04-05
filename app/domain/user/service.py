@@ -61,3 +61,18 @@ class UserService(BaseRepository[User]):
 
         await db.flush()
         return user
+
+    async def update_admin_status(
+        self,
+        db: AsyncSession,
+        user_id: int,
+        is_admin: bool,
+    ) -> User | None:
+        """Update user admin status."""
+        user = await self.get_by_id(db, user_id)
+        if not user:
+            return None
+
+        user.is_admin = is_admin
+        await db.flush()
+        return user

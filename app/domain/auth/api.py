@@ -9,6 +9,8 @@ from app.domain.auth.model import User
 from app.domain.auth.schema import (
     LoginRequest,
     MFAEnableRequest,
+    MFASetupRequest,
+    MFADisableRequest,
     MFASetupResponse,
     RefreshTokenRequest,
     TokenResponse,
@@ -54,6 +56,7 @@ async def logout(
 
 @router.post("/mfa/setup", response_model=MFASetupResponse)
 async def setup_mfa(
+    payload: MFASetupRequest,
     user_id: int = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
@@ -66,6 +69,10 @@ async def setup_mfa(
     
     if user.mfa_enabled:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="MFA already enabled")
+        
+    from app.core.security import verify_password
+    if not verify_password(payload.password, user.password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid password")
     
     # Generate new secret
     secret = MFAService.generate_secret()
@@ -110,7 +117,7 @@ async def enable_mfa(
 
 @router.post("/mfa/disable", status_code=status.HTTP_204_NO_CONTENT)
 async def disable_mfa(
-    payload: MFAEnableRequest,
+    payload: MFADisableRequest,
     user_id: int = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
@@ -121,6 +128,10 @@ async def disable_mfa(
     if not user or not user.mfa_enabled:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="MFA not enabled")
     
+    from app.core.security import verify_password
+    if not verify_password(payload.password, user.password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid password")
+        
     # Verify code before disabling
     if not MFAService.verify_code(user.mfa_secret, payload.code):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid MFA code")
