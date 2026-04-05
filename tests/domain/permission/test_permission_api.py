@@ -2,7 +2,9 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import hash_password
-from app.domain.auth.model import User, Role, Permission
+from app.domain.auth.model import User
+from app.domain.role.model import Role
+from app.domain.permission.model import Permission
 
 
 @pytest.fixture
@@ -49,7 +51,7 @@ class TestPermissionsAPI:
 
         # List permissions
         response = await client.get(
-            "/api/v1/auth/permissions",
+            "/api/v1/permissions",
             headers={"Authorization": f"Bearer {token}"},
         )
         assert response.status_code == 200
@@ -69,12 +71,12 @@ class TestPermissionsAPI:
 
         # List permissions
         response = await client.get(
-            "/api/v1/auth/permissions",
+            "/api/v1/permissions",
             headers={"Authorization": f"Bearer {token}"},
         )
         assert response.status_code == 403
         assert "Permission denied" in response.json()["detail"]
 
     async def test_list_permissions_unauthenticated(self, client: AsyncClient):
-        response = await client.get("/api/v1/auth/permissions")
+        response = await client.get("/api/v1/permissions")
         assert response.status_code == 401

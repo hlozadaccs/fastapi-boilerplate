@@ -5,7 +5,9 @@ from sqlalchemy import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import hash_password
-from app.domain.auth.model import Permission, Role, User, role_permissions, user_roles
+from app.domain.auth.model import User
+from app.domain.role.model import Role, user_roles
+from app.domain.permission.model import Permission, role_permissions
 
 
 @pytest_asyncio.fixture

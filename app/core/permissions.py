@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.auth.model import Permission
+from app.domain.permission.model import Permission
 
 
 async def ensure_model_permissions(db: AsyncSession, model_name: str) -> list[Permission]:
@@ -85,7 +85,7 @@ async def _sync_permissions_with_db(
     db: AsyncSession, expected_permissions: set[str]
 ) -> tuple[int, int]:
     """Synchronize with Database (Garbage Collection & Insertion)."""
-    from app.domain.auth.model import Permission
+    from app.domain.permission.model import Permission
 
     result = await db.execute(select(Permission))
     existing_perms = {p.code: p for p in result.scalars().all()}

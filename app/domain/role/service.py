@@ -2,7 +2,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.domain.auth.model import Permission, Role
+from app.domain.permission.model import Permission
+from app.domain.role.model import Role
 from app.domain.role.schema import RoleCreate, RoleUpdate
 from app.infrastructure.db.repository import BaseRepository
 
@@ -20,6 +21,7 @@ class RoleService(BaseRepository[Role]):
 
         # Create role
         role = Role(name=payload.name, description=payload.description)
+        role.permissions = []  # Initialize collection to avoid lazy load on first access
         db.add(role)
         await db.flush()
 
@@ -37,7 +39,7 @@ class RoleService(BaseRepository[Role]):
 
         await db.flush()
 
-        # Reload with permissions
+        # Reload with permissions explicitly using selectinload
         result = await db.execute(
             select(Role).where(Role.id == role.id).options(selectinload(Role.permissions))
         )
@@ -81,11 +83,9 @@ class RoleService(BaseRepository[Role]):
 
         await db.flush()
 
-        # Reload with permissions
-        result = await db.execute(
-            select(Role).where(Role.id == role.id).options(selectinload(Role.permissions))
-        )
-        return result.scalar_one()
+        # Reload with permissions explicitly
+        await db.refresh(role, attribute_names=["permissions"])
+        return role
 
     async def get_role_with_permissions(self, db: AsyncSession, role_id: int) -> Role | None:
         """Get role with permissions loaded."""

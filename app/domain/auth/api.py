@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.mfa import MFAService
-from app.domain.auth.dependencies import get_current_user_id, require_permission
+from app.domain.auth.dependencies import get_current_user_id
 from app.domain.auth.model import User
 from app.domain.auth.schema import (
     LoginRequest,
@@ -12,11 +12,10 @@ from app.domain.auth.schema import (
     MFAEnableRequest,
     MFASetupRequest,
     MFASetupResponse,
-    PermissionRead,
     RefreshTokenRequest,
     TokenResponse,
 )
-from app.domain.auth.service import AuthService, PermissionService
+from app.domain.auth.service import AuthService
 from app.infrastructure.db.dependencies import get_db
 from app.infrastructure.redis.client import get_redis
 
@@ -143,12 +142,3 @@ async def disable_mfa(
     user.mfa_enabled = False
     user.mfa_secret = None
     await db.commit()
-
-
-@router.get("/permissions", response_model=list[PermissionRead])
-async def list_permissions(
-    db: AsyncSession = Depends(get_db),
-    _: int = Depends(require_permission("role:read")),
-):
-    """List all available system permissions (Admin only)."""
-    return await PermissionService.list_permissions(db)

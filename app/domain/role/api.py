@@ -8,7 +8,7 @@ from app.core.pagination import Paginator
 from app.core.responses import PaginatedData
 from app.core.schemas import PaginationParams
 from app.domain.auth.dependencies import require_permission
-from app.domain.auth.model import Role
+from app.domain.role.model import Role
 from app.domain.role.schema import RoleCreate, RoleRead, RoleUpdate
 from app.domain.role.service import RoleService
 from app.infrastructure.db.dependencies import get_db
@@ -25,6 +25,8 @@ async def create_role(
 ):
     try:
         role = await role_service.create_role(db, payload)
+        # Extract permissions before commit to avoid lazy loading issues
+        permission_codes = [p.code for p in role.permissions]
         await db.commit()
         return RoleRead(
             id=role.id,
@@ -32,7 +34,7 @@ async def create_role(
             description=role.description,
             created_at=role.created_at,
             updated_at=role.updated_at,
-            permissions=[p.code for p in role.permissions],
+            permissions=permission_codes,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
@@ -99,6 +101,7 @@ async def update_role(
         if not role:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role not found")
 
+        permission_codes = [p.code for p in role.permissions]
         await db.commit()
         return RoleRead(
             id=role.id,
@@ -106,7 +109,7 @@ async def update_role(
             description=role.description,
             created_at=role.created_at,
             updated_at=role.updated_at,
-            permissions=[p.code for p in role.permissions],
+            permissions=permission_codes,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
@@ -124,6 +127,7 @@ async def partial_update_role(
         if not role:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role not found")
 
+        permission_codes = [p.code for p in role.permissions]
         await db.commit()
         return RoleRead(
             id=role.id,
@@ -131,7 +135,7 @@ async def partial_update_role(
             description=role.description,
             created_at=role.created_at,
             updated_at=role.updated_at,
-            permissions=[p.code for p in role.permissions],
+            permissions=permission_codes,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))

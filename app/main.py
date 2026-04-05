@@ -19,6 +19,7 @@ from app.core.permissions import auto_sync_permissions
 from app.domain.auth.exceptions import AuthenticationError
 from app.domain.auth.router import router as auth_router
 from app.domain.health.router import router as health_router
+from app.domain.permission.router import router as permission_router
 from app.domain.role.router import router as role_router
 from app.domain.user.router import router as user_router
 from app.infrastructure.db.session import AsyncSessionLocal
@@ -55,6 +56,7 @@ app.add_middleware(LoggingMiddleware)
 app.include_router(auth_router, prefix=settings.api_v1_prefix)
 app.include_router(user_router, prefix=settings.api_v1_prefix)
 app.include_router(role_router, prefix=settings.api_v1_prefix)
+app.include_router(permission_router, prefix=settings.api_v1_prefix)
 app.include_router(health_router, prefix=settings.api_v1_prefix)
 
 

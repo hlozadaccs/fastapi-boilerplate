@@ -10,7 +10,8 @@ import asyncio
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.auth.model import Permission, Role, role_permissions
+from app.domain.permission.model import Permission, role_permissions
+from app.domain.role.model import Role
 from app.infrastructure.db.session import AsyncSessionLocal
 
 # Define roles and their permissions
