@@ -56,10 +56,12 @@ class TestPermissionsAPI:
         )
         assert response.status_code == 200
         data = response.json()
-        assert isinstance(data, list)
-        if len(data) > 0:
-            assert "code" in data[0]
-            assert "description" in data[0]
+        assert "items" in data
+        assert "pagination" in data
+        assert isinstance(data["items"], list)
+        if len(data["items"]) > 0:
+            assert "code" in data["items"][0]
+            assert "description" in data["items"][0]
 
     async def test_list_permissions_regular_user_forbidden(self, client: AsyncClient, regular_user: User):
         # Login to get token

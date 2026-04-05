@@ -1,6 +1,8 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.pagination import Paginator
+from app.core.responses import PaginatedData
 from app.domain.auth.model import User
 from app.domain.permission.model import Permission
 
@@ -30,7 +32,10 @@ class PermissionService:
         return permission_code in permissions
 
     @staticmethod
-    async def list_permissions(db: AsyncSession) -> list[Permission]:
-        """Fetch all available permissions from the system."""
-        result = await db.execute(select(Permission).order_by(Permission.code))
-        return list(result.scalars().all())
+    async def list_permissions(
+        db: AsyncSession, page: int = 1, page_size: int = 20
+    ) -> PaginatedData[Permission]:
+        """Fetch all available permissions from the system with pagination."""
+        paginator: Paginator[Permission] = Paginator(page=page, page_size=page_size)
+        query = select(Permission).order_by(Permission.code)
+        return await paginator.paginate(db, query)
